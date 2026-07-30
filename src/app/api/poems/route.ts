@@ -55,6 +55,16 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Fetch poems error:', error);
-    return NextResponse.json({ error: '获取诗歌失败' }, { status: 500 });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({
+      error: '获取诗歌失败',
+      debug: {
+        message: errMsg.slice(0, 300),
+        hasDatabaseUrl: !!process.env.DATABASE_URL,
+        hasPostgresPrismaUrl: !!process.env.POSTGRES_PRISMA_URL,
+        hasPostgresUrl: !!process.env.POSTGRES_URL,
+        nodeEnv: process.env.NODE_ENV,
+      }
+    }, { status: 500 });
   }
 }
