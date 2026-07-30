@@ -55,16 +55,10 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Fetch poems error:', error);
-    const errMsg = error instanceof Error ? error.message : String(error);
+    // 优雅降级：数据库不可用时返回空列表而非 500
     return NextResponse.json({
-      error: '获取诗歌失败',
-      debug: {
-        message: errMsg.slice(0, 300),
-        hasDatabaseUrl: !!process.env.DATABASE_URL,
-        hasPostgresPrismaUrl: !!process.env.POSTGRES_PRISMA_URL,
-        hasPostgresUrl: !!process.env.POSTGRES_URL,
-        nodeEnv: process.env.NODE_ENV,
-      }
-    }, { status: 500 });
+      poems: [],
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
   }
 }

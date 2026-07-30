@@ -120,6 +120,15 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Fetch photos error:', error);
-    return NextResponse.json({ error: '获取照片失败' }, { status: 500 });
+    // 优雅降级：数据库不可用时返回空列表而非 500
+    return NextResponse.json({
+      photos: [],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 0,
+        totalPages: 0,
+      },
+    });
   }
 }
