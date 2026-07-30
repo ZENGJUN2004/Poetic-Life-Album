@@ -1,14 +1,12 @@
-// ============================================
-// Prisma Schema - PostgreSQL (Vercel 生产环境)
-// 本地开发请使用 schema.prisma (SQLite)
-// ============================================
+// Prisma Schema - SQLite (本地开发 / Docker)
+// 生产环境 (Vercel) 请使用 schema.prisma (PostgreSQL)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -18,12 +16,13 @@ model User {
   email         String    @unique
   name          String?
   avatar        String?
-  bio           String?
-  poeticDNA     String?
-  meaningScore  Float     @default(0)
+  bio           String?   // 个人简介
+  poeticDNA     String?   // Poetic DNA 诗意基因（JSON存储）
+  meaningScore  Float     @default(0) // 意义积分
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // 关系
   accounts      Account[]
   sessions      Session[]
   photos        Photo[]
@@ -79,13 +78,13 @@ model VerificationToken {
 model Photo {
   id          String    @id @default(cuid())
   userId      String
-  url         String
-  thumbnailUrl String?
-  caption     String?
-  takenAt     DateTime?
-  location    String?
-  isAnalyzed  Boolean   @default(false)
-  isPrivate   Boolean   @default(true)
+  url         String    // 存储URL
+  thumbnailUrl String?  // 缩略图
+  caption     String?   // 用户添加的标题/描述
+  takenAt     DateTime? // 拍摄时间
+  location    String?   // 地点
+  isAnalyzed  Boolean   @default(false) // 是否已完成AI分析
+  isPrivate   Boolean   @default(true) // 是否私密
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -101,13 +100,13 @@ model Photo {
 model PhotoAnalysis {
   id            String   @id @default(cuid())
   photoId       String   @unique
-  dominantColors String?
-  objects       String?
-  scenes        String?
-  emotions      String?
-  composition   String?
-  aestheticScore Float?
-  aiModel       String
+  dominantColors String? // JSON: 主色调分析
+  objects       String?  // JSON: 识别的物体
+  scenes        String?  // JSON: 场景分类
+  emotions      String?  // JSON: 情感分析
+  composition   String?  // JSON: 构图分析
+  aestheticScore Float?  // 美学评分
+  aiModel       String   // 使用的AI模型
   analyzedAt    DateTime @default(now())
 
   photo         Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
@@ -116,23 +115,27 @@ model PhotoAnalysis {
 }
 
 // ==================== 创作状态机（CSM）====================
+// SQLite 不支持 enum，使用 String 类型
+// SessionStatus: UPLOADING / ANALYZING / MEANING_EXTRACTING / MEANING_CONFIRMED / PLANNING / WRITING / REVIEWING / POLISHING / COMPLETED / SAVED / SHARED / FAILED / ABANDONED
+// CreativeMode: FREE / GUIDED / THEMATIC / SERIAL
+
 model CreativeSession {
   id            String    @id @default(cuid())
   userId        String
-  status        String    @default("UPLOADING")
-  mode          String    @default("FREE")
+  status        String    @default("UPLOADING") // SessionStatus
+  mode          String    @default("FREE") // CreativeMode
   currentStep   Int       @default(0)
-  title         String?
-  meaning       String?
+  title         String?   // 创作标题
+  meaning       String?   // 提取的意义
   meaningConfirmed Boolean @default(false)
-  userNote      String?
+  userNote      String?   // 用户备注
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   completedAt   DateTime?
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  photos        Photo[]
-  poem          Poem?
+  photos        Photo[]   // 参与的照片
+  poem          Poem?     // 生成的诗歌
   steps         SessionStep[]
   aiInteractions AIInteraction[]
 
@@ -144,13 +147,13 @@ model SessionStep {
   id          String   @id @default(cuid())
   sessionId   String
   stepNumber  Int
-  stepType    String
+  stepType    String   // UPLOAD/ANALYZE/MEANING/PLAN/WRITE/REVIEW/POLISH
   input       String?
   output      String?
-  status      String   @default("pending")
+  status      String   @default("pending") // pending/processing/completed/failed
   startedAt   DateTime?
   completedAt DateTime?
-  duration    Int?
+  duration    Int?     // 耗时（毫秒）
   aiModel     String?
   errorMsg    String?
 
@@ -167,15 +170,15 @@ model Poem {
   sessionId     String?   @unique
   title         String
   content       String
-  style         String?
-  emotion       String?
-  imagery       String?
-  meaning       String?
+  style         String?   // 诗风格
+  emotion       String?   // 情感标签
+  imagery       String?   // JSON: 意象列表
+  meaning       String?   // 关联的意义
   language      String    @default("zh")
   lineCount     Int
   wordCount     Int
   characterCount Int
-  qualityScore  Float?
+  qualityScore  Float?    // 质量评分
   isDraft       Boolean   @default(false)
   isPublic      Boolean   @default(false)
   viewCount     Int       @default(0)
@@ -201,7 +204,7 @@ model PoemRevision {
   version     Int
   content     String
   title       String
-  changedBy   String   @default("ai")
+  changedBy   String   @default("ai") // ai/user
   changeNote  String?
   createdAt   DateTime @default(now())
 
@@ -214,10 +217,10 @@ model PoemRevision {
 model ExplainCard {
   id            String   @id @default(cuid())
   poemId        String   @unique
-  meaningExplain String?
-  imagerySource String?
-  styleGuide    String?
-  creativePath  String?
+  meaningExplain String? // 意义阐释
+  imagerySource String?  // JSON: 意象来源
+  styleGuide    String?  // 风格指南
+  creativePath  String?  // JSON: 创作路径
   generatedAt   DateTime @default(now())
 
   poem          Poem     @relation(fields: [poemId], references: [id], onDelete: Cascade)
@@ -226,15 +229,17 @@ model ExplainCard {
 }
 
 // ==================== 意义知识体系（MKG）====================
+// KnowledgeType: IMAGERY / EMOTION / NARRATIVE / THEME / TECHNIQUE / REFERENCE
+
 model KnowledgeEntry {
   id          String         @id @default(cuid())
-  userId      String?
-  type        String
-  key         String
+  userId      String?        // 可为空（系统级知识）
+  type        String         // KnowledgeType
+  key         String         // 唯一标识
   title       String
   content     String
-  tags        String?
-  references  String?
+  tags        String?        // JSON: 标签
+  references  String?        // JSON: 参考引用
   usageCount  Int            @default(0)
   isVerified  Boolean        @default(false)
   createdAt   DateTime       @default(now())
@@ -252,15 +257,15 @@ model AIInteraction {
   id            String   @id @default(cuid())
   userId        String
   sessionId     String?
-  interactionType String
+  interactionType String  // VISION_ANALYSIS/MEANING_EXTRACTION/POEM_GENERATION/REVISION
   prompt        String
   response      String?
   aiModel       String
   tokenUsage    Int?
-  duration      Int?
+  duration      Int?     // 毫秒
   status        String   @default("success")
   errorMsg      String?
-  metadata      String?
+  metadata      String?  // JSON
   createdAt     DateTime @default(now())
 
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -278,8 +283,8 @@ model Collection {
   name        String
   description String?
   coverImage  String?
-  type        String    @default("poem")
-  poemIds     String?
+  type        String    @default("poem") // poem/photo/mixed
+  poemIds     String?   // JSON: 包含的诗歌ID列表
   isPublic    Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

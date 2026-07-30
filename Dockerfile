@@ -12,7 +12,7 @@ COPY prisma ./prisma/
 RUN npm ci
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN npx prisma generate --schema prisma/schema.sqlite.prisma
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -21,7 +21,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Ensure Prisma client is generated with the full source
-RUN npx prisma generate
+RUN npx prisma generate --schema prisma/schema.sqlite.prisma
 
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -74,6 +74,7 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 # Ensure DATABASE_URL is always available in standalone runtime (SQLite at /app/prisma/dev.db)
 ENV DATABASE_URL="file:/app/prisma/dev.db"
+ENV PRISMA_SCHEMA=prisma/schema.sqlite.prisma
 # NEXTAUTH secret fallback (avoid MissingSecretError when auth still called somewhere)
 ENV NEXTAUTH_SECRET="prd-nextauth-secret-fallback-do-not-use-for-real-auth"
 # AI fallback defaults
@@ -84,4 +85,4 @@ ENV PLANNER_MODEL=openrouter/claude-3-sonnet
 ENV LOCAL_STORAGE_PATH=/app/public/uploads
 
 # Start the server with auto-migration
-CMD ["sh", "-c", "npx prisma db push 2>/dev/null; node server.js"]
+CMD ["sh", "-c", "npx prisma db push --schema prisma/schema.sqlite.prisma 2>/dev/null; node server.js"]

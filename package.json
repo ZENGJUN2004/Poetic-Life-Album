@@ -5,13 +5,13 @@
   "description": "PoeticRealm - 诗意生活相册 | AI驱动的意义创作平台",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "echo 'postinstall done'",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push --schema prisma/schema.sqlite.prisma",
+    "db:migrate": "prisma migrate dev --schema prisma/schema.sqlite.prisma",
+    "db:studio": "prisma studio --schema prisma/schema.sqlite.prisma"
   },
   "engines": {
     "node": ">=20.0.0"
