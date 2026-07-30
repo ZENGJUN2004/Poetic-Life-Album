@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "export DATABASE_URL=\"${DATABASE_URL:-${POSTGRES_PRISMA_URL:-${POSTGRES_URL}}}\" && prisma generate && prisma db push --accept-data-loss && next build",
+  "buildCommand": "export DATABASE_URL=\"${DATABASE_URL:-${POSTGRES_PRISMA_URL:-${POSTGRES_URL}}}\" && prisma generate && (prisma db push --accept-data-loss 2>&1 || echo 'db push skipped - connect Postgres to enable API') && next build",
   "devCommand": "next dev",
   "installCommand": "npm install",
   "regions": ["hnd1"],
