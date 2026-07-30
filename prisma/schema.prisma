@@ -1,0 +1,304 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户系统 ====================
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatar        String?
+  bio           String?   // 个人简介
+  poeticDNA     String?   // Poetic DNA 诗意基因（JSON存储）
+  meaningScore  Float     @default(0) // 意义积分
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 关系
+  accounts      Account[]
+  sessions      Session[]
+  photos        Photo[]
+  poems         Poem[]
+  creativeSessions CreativeSession[]
+  knowledgeEntries KnowledgeEntry[]
+  aiInteractions AIInteraction[]
+  collections   Collection[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ==================== 照片系统 ====================
+model Photo {
+  id          String    @id @default(cuid())
+  userId      String
+  url         String    // 存储URL
+  thumbnailUrl String?  // 缩略图
+  caption     String?   // 用户添加的标题/描述
+  takenAt     DateTime? // 拍摄时间
+  location    String?   // 地点
+  isAnalyzed  Boolean   @default(false) // 是否已完成AI分析
+  isPrivate   Boolean   @default(true) // 是否私密
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analysis    PhotoAnalysis?
+  poems       Poem[]
+  creativeSessions CreativeSession[]
+
+  @@index([userId])
+  @@map("photos")
+}
+
+model PhotoAnalysis {
+  id            String   @id @default(cuid())
+  photoId       String   @unique
+  dominantColors String? // JSON: 主色调分析
+  objects       String?  // JSON: 识别的物体
+  scenes        String?  // JSON: 场景分类
+  emotions      String?  // JSON: 情感分析
+  composition   String?  // JSON: 构图分析
+  aestheticScore Float?  // 美学评分
+  aiModel       String   // 使用的AI模型
+  analyzedAt    DateTime @default(now())
+
+  photo         Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@map("photo_analyses")
+}
+
+// ==================== 创作状态机（CSM）====================
+// SQLite 不支持 enum，使用 String 类型
+// SessionStatus: UPLOADING / ANALYZING / MEANING_EXTRACTING / MEANING_CONFIRMED / PLANNING / WRITING / REVIEWING / POLISHING / COMPLETED / SAVED / SHARED / FAILED / ABANDONED
+// CreativeMode: FREE / GUIDED / THEMATIC / SERIAL
+
+model CreativeSession {
+  id            String    @id @default(cuid())
+  userId        String
+  status        String    @default("UPLOADING") // SessionStatus
+  mode          String    @default("FREE") // CreativeMode
+  currentStep   Int       @default(0)
+  title         String?   // 创作标题
+  meaning       String?   // 提取的意义
+  meaningConfirmed Boolean @default(false)
+  userNote      String?   // 用户备注
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos        Photo[]   // 参与的照片
+  poem          Poem?     // 生成的诗歌
+  steps         SessionStep[]
+  aiInteractions AIInteraction[]
+
+  @@index([userId, status])
+  @@map("creative_sessions")
+}
+
+model SessionStep {
+  id          String   @id @default(cuid())
+  sessionId   String
+  stepNumber  Int
+  stepType    String   // UPLOAD/ANALYZE/MEANING/PLAN/WRITE/REVIEW/POLISH
+  input       String?
+  output      String?
+  status      String   @default("pending") // pending/processing/completed/failed
+  startedAt   DateTime?
+  completedAt DateTime?
+  duration    Int?     // 耗时（毫秒）
+  aiModel     String?
+  errorMsg    String?
+
+  session     CreativeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("session_steps")
+}
+
+// ==================== 诗歌系统 ====================
+model Poem {
+  id            String    @id @default(cuid())
+  userId        String
+  sessionId     String?   @unique
+  title         String
+  content       String
+  style         String?   // 诗风格
+  emotion       String?   // 情感标签
+  imagery       String?   // JSON: 意象列表
+  meaning       String?   // 关联的意义
+  language      String    @default("zh")
+  lineCount     Int
+  wordCount     Int
+  characterCount Int
+  qualityScore  Float?    // 质量评分
+  isDraft       Boolean   @default(false)
+  isPublic      Boolean   @default(false)
+  viewCount     Int       @default(0)
+  likeCount     Int       @default(0)
+  shareCount    Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session       CreativeSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  photos        Photo[]
+  revisions     PoemRevision[]
+  explainCard   ExplainCard?
+
+  @@index([userId])
+  @@index([isPublic])
+  @@map("poems")
+}
+
+model PoemRevision {
+  id          String   @id @default(cuid())
+  poemId      String
+  version     Int
+  content     String
+  title       String
+  changedBy   String   @default("ai") // ai/user
+  changeNote  String?
+  createdAt   DateTime @default(now())
+
+  poem        Poem     @relation(fields: [poemId], references: [id], onDelete: Cascade)
+
+  @@unique([poemId, version])
+  @@map("poem_revisions")
+}
+
+model ExplainCard {
+  id            String   @id @default(cuid())
+  poemId        String   @unique
+  meaningExplain String? // 意义阐释
+  imagerySource String?  // JSON: 意象来源
+  styleGuide    String?  // 风格指南
+  creativePath  String?  // JSON: 创作路径
+  generatedAt   DateTime @default(now())
+
+  poem          Poem     @relation(fields: [poemId], references: [id], onDelete: Cascade)
+
+  @@map("explain_cards")
+}
+
+// ==================== 意义知识体系（MKG）====================
+// KnowledgeType: IMAGERY / EMOTION / NARRATIVE / THEME / TECHNIQUE / REFERENCE
+
+model KnowledgeEntry {
+  id          String         @id @default(cuid())
+  userId      String?        // 可为空（系统级知识）
+  type        String         // KnowledgeType
+  key         String         // 唯一标识
+  title       String
+  content     String
+  tags        String?        // JSON: 标签
+  references  String?        // JSON: 参考引用
+  usageCount  Int            @default(0)
+  isVerified  Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user        User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([type, key])
+  @@index([type])
+  @@map("knowledge_entries")
+}
+
+// ==================== AI交互记录 ====================
+model AIInteraction {
+  id            String   @id @default(cuid())
+  userId        String
+  sessionId     String?
+  interactionType String  // VISION_ANALYSIS/MEANING_EXTRACTION/POEM_GENERATION/REVISION
+  prompt        String
+  response      String?
+  aiModel       String
+  tokenUsage    Int?
+  duration      Int?     // 毫秒
+  status        String   @default("success")
+  errorMsg      String?
+  metadata      String?  // JSON
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session       CreativeSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([interactionType])
+  @@map("ai_interactions")
+}
+
+// ==================== 诗集/相册 ====================
+model Collection {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  coverImage  String?
+  type        String    @default("poem") // poem/photo/mixed
+  poemIds     String?   // JSON: 包含的诗歌ID列表
+  isPublic    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("collections")
+}
+
+// ==================== 系统配置 ====================
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}

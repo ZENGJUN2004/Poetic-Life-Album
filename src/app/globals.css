@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    background-image: 
+      radial-gradient(at 10% 0%, rgba(212, 184, 150, 0.1) 0px, transparent 50%),
+      radial-gradient(at 90% 0%, rgba(165, 185, 209, 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(212, 184, 150, 0.08) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background-color: rgba(212, 184, 150, 0.3);
+    color: inherit;
+  }
+}
+
+@layer components {
+  .poem-text {
+    @apply font-poem text-lg leading-loose text-ink-800 whitespace-pre-line;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-ink-800 px-6 py-3 text-sm font-medium text-parchment-50 transition-all hover:bg-ink-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-lg border border-ink-300 bg-white/50 px-6 py-3 text-sm font-medium text-ink-700 transition-all hover:border-ink-400 hover:bg-white hover:shadow-sm active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-ink-600 transition-colors hover:bg-parchment-100 hover:text-ink-800;
+  }
+
+  .card {
+    @apply rounded-xl border border-parchment-200 bg-white/70 backdrop-blur-sm shadow-sm transition-shadow hover:shadow-md;
+  }
+
+  .card-hover {
+    @apply rounded-xl border border-parchment-200 bg-white/70 backdrop-blur-sm shadow-sm transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-ink-200 bg-white/80 px-4 py-3 text-sm text-ink-800 placeholder:text-ink-400 transition-colors focus:border-ink-400 focus:outline-none focus:ring-2 focus:ring-ink-200;
+  }
+
+  .textarea {
+    @apply w-full rounded-lg border border-ink-200 bg-white/80 px-4 py-3 text-sm text-ink-800 placeholder:text-ink-400 transition-colors focus:border-ink-400 focus:outline-none focus:ring-2 focus:ring-ink-200 min-h-[120px] resize-y;
+  }
+
+  .label {
+    @apply mb-2 block text-sm font-medium text-ink-700;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full border border-parchment-300 bg-parchment-100 px-2.5 py-0.5 text-xs font-medium text-parchment-800;
+  }
+
+  .badge-ink {
+    @apply inline-flex items-center rounded-full border border-ink-200 bg-ink-50 px-2.5 py-0.5 text-xs font-medium text-ink-700;
+  }
+
+  .link-underline {
+    @apply relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-ink-700 after:transition-all hover:after:w-full;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.ink.300') transparent;
+  }
+
+  .poem-line {
+    @apply opacity-0 animate-ink-spread;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .glass {
+    @apply bg-white/60 backdrop-blur-md;
+  }
+
+  .glass-strong {
+    @apply bg-white/80 backdrop-blur-lg;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
