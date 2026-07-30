@@ -25,6 +25,8 @@ RUN npx prisma generate
 
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
+# Enable standalone output for Vercel-style optimized build
+ENV NEXT_OUTPUT=standalone
 
 # Build the application
 RUN npm run build
