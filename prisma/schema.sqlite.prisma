@@ -106,7 +106,7 @@ model PhotoAnalysis {
   emotions      String?  // JSON: 情感分析
   composition   String?  // JSON: 构图分析
   aestheticScore Float?  // 美学评分
-  aiModel       String   // 使用的AI模型
+  aiModel       String   @default("heuristics:v1") // 无AI时 heuristics:v1，有AI时填模型名
   analyzedAt    DateTime @default(now())
 
   photo         Photo    @relation(fields: [photoId], references: [id], onDelete: Cascade)

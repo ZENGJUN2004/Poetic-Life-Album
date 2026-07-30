@@ -35,6 +35,21 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as any;
+    const id = searchParams.get('id');
+
+    if (id) {
+      const single = await prisma.creativeSession.findUnique({
+        where: { id },
+        include: { photos: true, poem: true, steps: true },
+      });
+      if (!single) {
+        return NextResponse.json({ error: '会话不存在' }, { status: 404 });
+      }
+      if (single.userId !== userId) {
+        return NextResponse.json({ error: '无权限访问' }, { status: 403 });
+      }
+      return NextResponse.json(single);
+    }
 
     const sessions = await csm.getUserSessions(userId, status || undefined);
 

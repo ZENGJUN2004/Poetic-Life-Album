@@ -104,28 +104,64 @@ export default function CreatePage() {
       });
 
       if (!sessionResponse.ok) {
-        throw new Error('创建创作会话失败');
+        let msg = '创建创作会话失败';
+        try {
+          const d = await sessionResponse.json();
+          if (d && d.error) msg = d.error;
+        } catch {}
+        throw new Error(msg);
       }
 
       const sessionData = await sessionResponse.json();
       setSessionId(sessionData.id);
       setStatus('ANALYZING');
 
-      // Step 2: Generate poem
-      const generateResponse = await fetch('/api/poems/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: sessionData.id,
-          style,
-        }),
-      });
+      // Step 2: Poll session status while generating (so progress advances)
+      let pollStop = false;
+      const pollStatus = async () => {
+        while (!pollStop) {
+          try {
+            // Wait first, then poll to give backend a head start
+            await new Promise((r) => setTimeout(r, 1500));
+            if (pollStop) break;
+            const s = await fetch(`/api/sessions?id=${sessionData.id}`);
+            if (!s.ok) continue;
+            const list = await s.json();
+            const current = Array.isArray(list)
+              ? list.find((x: any) => x.id === sessionData.id)
+              : (list as any)?.id === sessionData.id ? list : null;
+            if (current && current.status) setStatus(current.status);
+          } catch {}
+        }
+      };
+      const pollPromise = pollStatus();
 
-      if (!generateResponse.ok) {
-        throw new Error('诗歌生成失败');
+      // Step 3: Generate poem (may take several seconds)
+      let generateData: any = null;
+      try {
+        const generateResponse = await fetch('/api/poems/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionData.id,
+            style,
+          }),
+        });
+
+        if (!generateResponse.ok) {
+          let msg = '诗歌生成失败';
+          try {
+            const d = await generateResponse.json();
+            if (d && d.error) msg = d.error;
+          } catch {}
+          throw new Error(msg);
+        }
+        generateData = await generateResponse.json();
+      } finally {
+        pollStop = true;
+        try { await pollPromise; } catch {}
       }
 
-      const generateData = await generateResponse.json();
       setMeaning(generateData.meaning);
       setPoem(generateData.poem.content);
       setStatus('COMPLETED');

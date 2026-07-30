@@ -14,6 +14,20 @@ import {
 } from '@/lib/ai/prompts';
 import { extractPoemMetrics } from '@/lib/utils';
 
+/** 强校验的状态流转：任何非法跳转立即抛错，避免状态卡死却静默失败 */
+async function transitionOrThrow(sessionId: string, target: string) {
+  const res = await csm.transitionTo(sessionId, target);
+  if (!res.success) {
+    const err = new Error(
+      `状态流转失败: ${res.previousStatus || '?'} → ${target} (${res.error || 'unknown'})`
+    );
+    (err as any).sessionStatus = res.previousStatus;
+    (err as any).targetStatus = target;
+    throw err;
+  }
+  return res;
+}
+
 /** Deterministic hash helper used to vary fallback outputs */
 function strHash(s: string): number {
   let h = 2166136261;
@@ -370,7 +384,7 @@ export async function POST(request: Request) {
     }
 
     // Step 1: Vision Analysis
-    await csm.transitionTo(sessionId, 'ANALYZING');
+    await transitionOrThrow(sessionId, 'ANALYZING');
     const analyzeStep = await csm.addStep(sessionId, 'ANALYZE', JSON.stringify({ photoUrls }));
     
     const analyses: any[] = [];
@@ -391,7 +405,7 @@ export async function POST(request: Request) {
             emotions: JSON.stringify(parsedAnalysis.emotion ? [parsedAnalysis.emotion] : []),
             composition: JSON.stringify(parsedAnalysis.composition || ''),
             aestheticScore: parsedAnalysis.aestheticScore,
-            aiModel: analysisResult.model,
+            aiModel: analysisResult.model || 'heuristics:v1',
           },
           update: {
             dominantColors: JSON.stringify(parsedAnalysis.dominantColors || []),
@@ -400,7 +414,7 @@ export async function POST(request: Request) {
             emotions: JSON.stringify(parsedAnalysis.emotion ? [parsedAnalysis.emotion] : []),
             composition: JSON.stringify(parsedAnalysis.composition || ''),
             aestheticScore: parsedAnalysis.aestheticScore,
-            aiModel: analysisResult.model,
+            aiModel: analysisResult.model || 'heuristics:v1',
           },
         });
       } catch (error) {
@@ -440,7 +454,7 @@ export async function POST(request: Request) {
     });
 
     // Step 2: Meaning Extraction
-    await csm.transitionTo(sessionId, 'MEANING_EXTRACTING');
+    await transitionOrThrow(sessionId, 'MEANING_EXTRACTING');
     const meaningStep = await csm.addStep(sessionId, 'MEANING', JSON.stringify({ analyses }));
     
     let meaning: any = null;
@@ -478,9 +492,9 @@ export async function POST(request: Request) {
     });
 
     // Step 3: Poem Generation
-    await csm.transitionTo(sessionId, 'PLANNING');
+    await transitionOrThrow(sessionId, 'PLANNING');
     await csm.addStep(sessionId, 'PLANNING');
-    await csm.transitionTo(sessionId, 'WRITING');
+    await transitionOrThrow(sessionId, 'WRITING');
     
     const writeStep = await csm.addStep(sessionId, 'WRITE', JSON.stringify({ meaning, style }));
     
@@ -512,7 +526,7 @@ export async function POST(request: Request) {
 
     // Step 4: Review (optional)
     if (!skipReview) {
-      await csm.transitionTo(sessionId, 'REVIEWING');
+      await transitionOrThrow(sessionId, 'REVIEWING');
       const reviewStep = await csm.addStep(sessionId, 'REVIEW', poemContent);
       
       try {
@@ -531,7 +545,7 @@ export async function POST(request: Request) {
         
         if (review.overallQuality && review.overallQuality >= 7) {
           // Step 5: Polish if needed
-          await csm.transitionTo(sessionId, 'POLISHING');
+          await transitionOrThrow(sessionId, 'POLISHING');
           const polishStep = await csm.addStep(sessionId, 'POLISH', poemContent);
           
           try {
