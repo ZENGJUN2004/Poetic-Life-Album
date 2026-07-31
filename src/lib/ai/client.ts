@@ -131,33 +131,41 @@ export class AIClient {
     }
   }
 
-  /** OpenAI-compatible chat/completions vision call (OpenRouter / OpenAI / Anthropic-via-OR). */
+  /** OpenAI-compatible chat/completions vision call (OpenRouter / OpenAI / Anthropic-via-OR / Zhipu). */
   private async analyzeImageOpenAI(
     imageUrl: string,
     prompt: string,
     actualModel: string,
     startTime: number
   ): Promise<AIResponse> {
+    const body: Record<string, unknown> = {
+      model: actualModel,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: imageUrl } },
+          ],
+        },
+      ],
+      max_tokens: 4000,
+      temperature: 0.7,
+    };
+    // Zhipu GLM-4.6V/4.7-Flash default to thinking mode which can consume
+    // all max_tokens on reasoning and return empty content. Disable it for
+    // structured vision analysis (prompt is already explicit).
+    if (this.config.provider === 'zhipu') {
+      body.thinking = { type: 'disabled' };
+    }
+
     const response = await fetch(`${this.getBaseUrl()}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: actualModel,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              { type: 'image_url', image_url: { url: imageUrl } },
-            ],
-          },
-        ],
-        max_tokens: 2000,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -270,18 +278,23 @@ export class AIClient {
     if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
     messages.push({ role: 'user', content: prompt });
 
+    const body: Record<string, unknown> = {
+      model: actualModel,
+      messages,
+      max_tokens: 4000,
+      temperature,
+    };
+    if (this.config.provider === 'zhipu') {
+      body.thinking = { type: 'disabled' };
+    }
+
     const response = await fetch(`${this.getBaseUrl()}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: actualModel,
-        messages,
-        max_tokens: 3000,
-        temperature,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
