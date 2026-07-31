@@ -116,7 +116,7 @@ export class AIClient {
     const defaultVisionModel = this.isGoogle()
       ? 'gemini-2.0-flash'
       : this.config.provider === 'zhipu'
-        ? 'glm-4v-flash'
+        ? 'glm-4.6v-flash'
         : 'gpt-4o-vision';
     const actualModel = model || process.env.VISION_MODEL || defaultVisionModel;
 
@@ -244,7 +244,7 @@ export class AIClient {
     const defaultTextModel = this.isGoogle()
       ? 'gemini-2.0-flash'
       : this.config.provider === 'zhipu'
-        ? 'glm-4-flash'
+        ? 'glm-4.7-flash'
         : 'gpt-4o';
     const actualModel = model || process.env.WRITER_MODEL || defaultTextModel;
 
