@@ -7,6 +7,9 @@ import { analyzeImageBuffer } from '@/lib/vision-heuristics';
 import { createAIClient } from '@/lib/ai/client';
 import { VISION_ANALYSIS_PROMPT } from '@/lib/ai/prompts';
 
+// Vercel Hobby 默认 10s，AI 视觉调用 ~5s + heuristic + DB writes 需要 60s 上限
+export const maxDuration = 60;
+
 /** Parse AI's text response into a JSON object (best-effort, tolerant of ``` fences). */
 function parseAIResponse(content: string): any {
   try {

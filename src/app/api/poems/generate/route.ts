@@ -14,6 +14,9 @@ import {
 } from '@/lib/ai/prompts';
 import { extractPoemMetrics } from '@/lib/utils';
 
+// Vercel Hobby 默认 10s，完整管线 (vision + meaning + poem + review + polish + explain) 需要 60s
+export const maxDuration = 60;
+
 /** 强校验的状态流转：任何非法跳转立即抛错，避免状态卡死却静默失败 */
 async function transitionOrThrow(sessionId: string, target: string) {
   const res = await csm.transitionTo(sessionId, target);
@@ -392,6 +395,24 @@ export async function POST(request: Request) {
     const analyses: any[] = [];
     for (const photo of creativeSession.photos) {
       const photoUrl = photo.url;
+
+      // Check cached analysis first — if upload already did real AI vision,
+      // skip the redundant API call (saves ~5s per photo).
+      try {
+        const cached = await prisma.photoAnalysis.findUnique({
+          where: { photoId: photo.id },
+          select: {
+            dominantColors: true, objects: true, scenes: true, emotions: true,
+            composition: true, aestheticScore: true, aiModel: true,
+          },
+        });
+        if (cached && cached.aiModel && cached.aiModel !== 'heuristics:v1' &&
+            (cached.objects || cached.scenes || cached.dominantColors)) {
+          analyses.push({ url: photoUrl, analysis: { ...cached } });
+          continue;
+        }
+      } catch { /* fall through to AI call */ }
+
       try {
         // Gemini requires inline base64 (it cannot fetch a relative /api/uploads/... URL).
         // OpenAI/OpenRouter providers can take an http(s) URL directly, but they also
