@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { csm } from '@/lib/csm';
 import { getDefaultUserId } from '@/lib/default-user';
-import { createAIClient } from '@/lib/ai/client';
+import { createAIClient, photoToDataUrl } from '@/lib/ai/client';
 import {
   VISION_ANALYSIS_PROMPT,
   MEANING_EXTRACTION_PROMPT,
@@ -386,12 +386,29 @@ export async function POST(request: Request) {
     // Step 1: Vision Analysis
     await transitionOrThrow(sessionId, 'ANALYZING');
     const analyzeStep = await csm.addStep(sessionId, 'ANALYZE', JSON.stringify({ photoUrls }));
-    
+
+    const isGemini = aiClient.isGoogle();
+
     const analyses: any[] = [];
     for (const photo of creativeSession.photos) {
       const photoUrl = photo.url;
       try {
-        const analysisResult = await aiClient.analyzeImage(photoUrl, VISION_ANALYSIS_PROMPT);
+        // Gemini requires inline base64 (it cannot fetch a relative /api/uploads/... URL).
+        // OpenAI/OpenRouter providers can take an http(s) URL directly, but they also
+        // accept data: URLs — so we normalize everything to a data URL for safety.
+        let imageInput = photoUrl;
+        if (isGemini || photoUrl.startsWith('/')) {
+          try {
+            imageInput = await photoToDataUrl(photoUrl);
+          } catch (readErr) {
+            // If we can't read the file locally (e.g. it's a Vercel Blob URL on prod
+            // but provider is openrouter), fall back to passing the raw URL for OR.
+            if (isGemini) throw readErr;
+            imageInput = photoUrl;
+          }
+        }
+
+        const analysisResult = await aiClient.analyzeImage(imageInput, VISION_ANALYSIS_PROMPT);
         const parsedAnalysis = parseAIResponse(analysisResult.content);
         analyses.push({ url: photoUrl, analysis: parsedAnalysis });
 
