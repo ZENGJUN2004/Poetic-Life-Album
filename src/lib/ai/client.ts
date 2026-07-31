@@ -96,6 +96,11 @@ export class AIClient {
     return this.config.provider === 'google';
   }
 
+  /** True if this client has a real AI API key configured (not just heuristics). */
+  hasApiKey(): boolean {
+    return !!this.config.apiKey && !this.config.apiKey.startsWith('your-');
+  }
+
   /**
    * Analyze an image. `imageUrlOrDataUrl` may be:
    *   - an http(s) URL (for OpenAI/OpenRouter providers)
@@ -108,7 +113,12 @@ export class AIClient {
     model?: string
   ): Promise<AIResponse> {
     const startTime = Date.now();
-    const actualModel = model || process.env.VISION_MODEL || (this.isGoogle() ? 'gemini-2.0-flash' : 'gpt-4o-vision');
+    const defaultVisionModel = this.isGoogle()
+      ? 'gemini-2.0-flash'
+      : this.config.provider === 'zhipu'
+        ? 'glm-4v-flash'
+        : 'gpt-4o-vision';
+    const actualModel = model || process.env.VISION_MODEL || defaultVisionModel;
 
     try {
       if (this.isGoogle()) {
@@ -231,7 +241,12 @@ export class AIClient {
     temperature: number = 0.8
   ): Promise<AIResponse> {
     const startTime = Date.now();
-    const actualModel = model || process.env.WRITER_MODEL || (this.isGoogle() ? 'gemini-2.0-flash' : 'gpt-4o');
+    const defaultTextModel = this.isGoogle()
+      ? 'gemini-2.0-flash'
+      : this.config.provider === 'zhipu'
+        ? 'glm-4-flash'
+        : 'gpt-4o';
+    const actualModel = model || process.env.WRITER_MODEL || defaultTextModel;
 
     try {
       if (this.isGoogle()) {
@@ -343,6 +358,9 @@ export class AIClient {
       case 'google':
         // v1beta exposes gemini-1.5 / 2.0 flash & pro
         return 'https://generativelanguage.googleapis.com/v1beta';
+      case 'zhipu':
+        // 智谱 GLM 开放平台 — OpenAI 兼容
+        return 'https://open.bigmodel.cn/api/paas/v4';
       default:
         return this.config.baseUrl || 'https://api.openai.com/v1';
     }
@@ -350,10 +368,11 @@ export class AIClient {
 }
 
 export function createAIClient(): AIClient {
-  // Priority: GEMINI_API_KEY > OPENROUTER_API_KEY > OPENAI_API_KEY > ANTHROPIC_API_KEY
-  // If GEMINI_API_KEY is present we default to google provider unless MODEL_PROVIDER
-  // explicitly overrides it.
+  // Priority: ZHIPU_API_KEY > GEMINI_API_KEY > OPENROUTER_API_KEY > OPENAI_API_KEY > ANTHROPIC_API_KEY
+  // If ZHIPU_API_KEY is present we default to zhipu provider unless MODEL_PROVIDER
+  // explicitly overrides it (zhipu works in China without VPN).
   const explicitProvider = process.env.MODEL_PROVIDER;
+  const zhipuKey = process.env.ZHIPU_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openRouterKey = process.env.OPENROUTER_API_KEY;
   const openAiKey = process.env.OPENAI_API_KEY;
@@ -362,18 +381,24 @@ export function createAIClient(): AIClient {
   let provider: string;
   let apiKey: string;
 
-  if (explicitProvider === 'google' && geminiKey) {
+  if (explicitProvider === 'zhipu' && zhipuKey) {
+    provider = 'zhipu';
+    apiKey = zhipuKey;
+  } else if (explicitProvider === 'google' && geminiKey) {
     provider = 'google';
     apiKey = geminiKey;
+  } else if (zhipuKey && !explicitProvider) {
+    provider = 'zhipu';
+    apiKey = zhipuKey;
   } else if (geminiKey && !explicitProvider) {
     provider = 'google';
     apiKey = geminiKey;
   } else if (explicitProvider) {
     provider = explicitProvider;
-    apiKey = openRouterKey || openAiKey || anthropicKey || geminiKey || '';
+    apiKey = zhipuKey || openRouterKey || openAiKey || anthropicKey || geminiKey || '';
   } else {
-    provider = 'openrouter';
-    apiKey = openRouterKey || openAiKey || anthropicKey || geminiKey || '';
+    provider = 'zhipu';
+    apiKey = zhipuKey || openRouterKey || openAiKey || anthropicKey || geminiKey || '';
   }
 
   return new AIClient({ provider, apiKey });

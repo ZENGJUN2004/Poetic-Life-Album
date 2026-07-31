@@ -88,13 +88,14 @@ export async function POST(request: Request) {
           console.error('Heuristic analysis failed for', file.name, anaErr);
         }
 
-        // If a real AI vision provider is configured (e.g. Gemini), run the real
-        // recognition now and overwrite the heuristic record. Heuristics remain
-        // as a fallback if AI fails. We pass the image inline as base64 data URL
-        // so this works regardless of whether the URL is reachable from the AI.
+        // If a real AI vision provider is configured (e.g. Zhipu GLM-4V / Gemini),
+        // run the real recognition now and overwrite the heuristic record.
+        // Heuristics remain as a fallback if AI fails. We pass the image inline
+        // as base64 data URL so this works regardless of whether the URL is
+        // reachable from the AI.
         try {
           const aiClient = createAIClient();
-          if (aiClient.isGoogle() || process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY) {
+          if (aiClient.hasApiKey()) {
             const mime = file.type || 'image/jpeg';
             const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
             const aiResult = await aiClient.analyzeImage(dataUrl, VISION_ANALYSIS_PROMPT);
