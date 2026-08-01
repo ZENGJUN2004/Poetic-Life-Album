@@ -11,11 +11,26 @@ export const APP_CONFIG = {
 };
 
 export const POEM_STYLES = [
-  { value: 'free', label: '自由诗', description: '不拘格律，自然流畅' },
-  { value: 'classical', label: '古诗风格', description: '模仿古典诗词意境' },
-  { value: 'modern', label: '现代诗', description: '现代新诗风格' },
-  { value: 'haiku', label: '俳句', description: '日本俳句风格' },
-  { value: 'cinquain', label: '五行诗', description: '英文五行诗' },
+  // 中国古典（4种）—— 严格格律约束
+  { value: 'wuyan_jueju', label: '五言绝句', category: '古典', description: '4行20字，五言一句，二四句押韵' },
+  { value: 'qiyan_jueju', label: '七言绝句', category: '古典', description: '4行28字，七言一句，二四句押韵' },
+  { value: 'qiyan_lushi', label: '七言律诗', category: '古典', description: '8行56字，颔联颈联对仗，平仄严整' },
+  { value: 'ci_pai', label: '宋词', category: '古典', description: '依词牌填词，如《如梦令》《浣溪沙》' },
+
+  // 东方（1种）
+  { value: 'haiku', label: '俳句', category: '东方', description: '5·7·5 音节，重季语，禅意悠远' },
+
+  // 现代（3种）
+  { value: 'modern_short', label: '现代短诗', category: '现代', description: '4-8行，意象密集，情感凝练' },
+  { value: 'modern_lyric', label: '抒情现代诗', category: '现代', description: '8-16行，情绪递进，可叙可抒' },
+  { value: 'prose_poem', label: '散文诗', category: '现代', description: '不分行的诗化散文，100-200字' },
+
+  // 西式（2种）
+  { value: 'sonnet', label: '十四行诗', category: '西式', description: '莎士比亚体，14行，ABAB CDCD EFEF GG' },
+  { value: 'cinquain', label: '五行诗', category: '西式', description: '2-4-6-8-2 字数递进' },
+
+  // 自由（1种）
+  { value: 'free', label: '自由诗', category: '现代', description: '不拘格律，自然流畅' },
 ] as const;
 
 export const CREATIVE_MODES = [

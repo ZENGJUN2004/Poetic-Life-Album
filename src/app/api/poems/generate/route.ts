@@ -11,6 +11,8 @@ import {
   POEM_POLISH_PROMPT,
   EXPLAIN_CARD_PROMPT,
   SYSTEM_PROMPTS,
+  POEM_STYLE_GUIDE,
+  LEGACY_STYLE_MAP,
 } from '@/lib/ai/prompts';
 import { extractPoemMetrics } from '@/lib/utils';
 
@@ -216,12 +218,52 @@ function generateFallbackPoem(
   const pick = <T,>(arr: T[], i: number) => arr[(seed + i) % arr.length];
 
   switch (style) {
+    case 'wuyan_jueju': {
+      // 五言绝句：4 行 5 字
+      const clamp5 = (s: string) => {
+        let out = '', n = 0;
+        for (const ch of s) {
+          if (n >= 5) break;
+          if (ch === ' ' || ch === '_') continue;
+          out += ch; n++;
+        }
+        return out;
+      };
+      const L1 = [
+        clamp5(`${img1.slice(0,2)}映窗台`),
+        clamp5(`远山${img2.slice(0,2)}深`),
+        clamp5(`月下${img1.slice(0,2)}`),
+        clamp5(`${img2.slice(0,2)}入梦来`),
+        clamp5(`风过${img3.slice(0,2)}`),
+      ];
+      const L2 = [
+        clamp5(`${emo.slice(0,2)}满心怀`),
+        clamp5(`一念${emo2.slice(0,2)}`),
+        clamp5(`旧事上心来`),
+        clamp5(`${img2.slice(0,2)}伴我回`),
+        clamp5(`坐看云起时`),
+      ];
+      const L3 = [
+        clamp5(`欲问${img3.slice(0,2)}`),
+        clamp5(`但见${img1.slice(0,2)}`),
+        clamp5(`此心无处寄`),
+        clamp5(`人在画中行`),
+        clamp5(`不觉夜已深`),
+      ];
+      const L4 = [
+        clamp5(`${emo.slice(0,2)}入梦来`),
+        clamp5(`心安即是归`),
+        clamp5(`一念一安然`),
+        clamp5(`岁岁不知年`),
+        clamp5(`此意最难忘`),
+      ];
+      return [pick(L1, 0), pick(L2, 1), pick(L3, 2), pick(L4, 3)].join('\n');
+    }
+
+    case 'qiyan_jueju':
     case 'classical': {
-      // 4 lines, 7 chars each — 古诗风格.
-      // Build each line as "<image/emotion prefix> + classic Chinese phrase",
-      // then clamp to exactly 7 CJK chars. NEVER insert padding chars.
+      // 七言绝句：4 行 7 字（classical 旧值兼容）
       const clamp7 = (s: string) => {
-        // count by code points, keep first 7 CJK chars / digits / latin
         let out = '', n = 0;
         for (const ch of s) {
           if (n >= 7) break;
@@ -269,6 +311,40 @@ function generateFallbackPoem(
       return [pick(L1, 0), pick(L2, 1), pick(L3, 2), pick(L4, 3)].join('\n');
     }
 
+    case 'qiyan_lushi': {
+      // 七言律诗：8 行 7 字
+      const clamp7 = (s: string) => {
+        let out = '', n = 0;
+        for (const ch of s) {
+          if (n >= 7) break;
+          if (ch === ' ' || ch === '_') continue;
+          out += ch; n++;
+        }
+        return out;
+      };
+      return [
+        clamp7(`${img1.slice(0,3)}映远天`),
+        clamp7(`${img2.slice(0,3)}落眼前`),
+        clamp7(`${emo.slice(0,2)}随风过${img3.slice(0,1)}`),
+        clamp7(`${emo2.slice(0,2)}伴月入心田`),
+        clamp7(`欲问此心归去处`),
+        clamp7(`但凭${img1.slice(0,2)}寄流年`),
+        clamp7(`${coreTiny.slice(0,3)}人未老`),
+        clamp7(`一念安然天地间`),
+      ].join('\n');
+    }
+
+    case 'ci_pai': {
+      // 宋词 fallback：用《如梦令》词牌
+      return `《如梦令》
+${img1.slice(0,3)}落${img2.slice(0,2)}，
+${emo}满怀难收。
+试问${img3.slice(0,2)}，
+却道${emo2}依旧。
+知否，知否？
+应是${coreTiny.slice(0,3)}难忘。`;
+    }
+
     case 'haiku': {
       // 5·7·5 俳句
       const clamp = (n: number, s: string) => {
@@ -304,23 +380,25 @@ function generateFallbackPoem(
       return [pick(H1_opts, 0), pick(H2_opts, 1), pick(H3_opts, 2)].join('\n');
     }
 
-    case 'cinquain': {
-      const nouns = [img1, img2, img3].filter(Boolean);
-      if (!nouns.length) nouns.push(coreTiny);
-      const pairs = [`柔软, ${emo}`, `宁静, 悠长`, '温暖, 明亮', '轻盈, 自由', `${emo}, ${emo2}`];
-      const triples = ['低语, 流淌, 停留', '摇曳, 回响, 沉淀', '轻吻, 拥抱, 绽放', '飘过, 停驻, 铭记', '漫过, 摇曳, 藏进'];
-      const feelings = [`想起${coreTiny}`, `${emo}${emo2}的味道`, '时间忽然慢下来', '这一刻被温柔以待'];
-      const endings = ['岁月', '心安', '时光', '归处', '远方', '铭记', coreTiny || '岁月'];
-      return [
-        pick(nouns, 0),
-        pick(pairs, 1),
-        pick(triples, 2),
-        pick(feelings, 3),
-        pick(endings, 4),
-      ].join('\n');
+    case 'modern_short': {
+      const S = [
+        `${img1}落在${img2}上`,
+        `像一封迟到的信`,
+        `我把它折成${img3}`,
+        `放进${emo}的口袋`,
+        `——${coreRaw}——`,
+        `后来风起了`,
+        `信也就没了地址`,
+        `只剩${emo2}还在原处`,
+      ];
+      const count = 4 + (seed % 3);
+      const start = seed % Math.max(1, S.length - count);
+      return S.slice(start, start + count).join('\n');
     }
 
+    case 'modern_lyric':
     case 'modern': {
+      // modern 旧值兼容到 modern_lyric
       const S = [
         `我用${img1}写下一封信`,
         `收信人是二十年前的自己`,
@@ -337,6 +415,54 @@ function generateFallbackPoem(
       const count = 8 + (seed % 3);
       const start = seed % Math.max(1, S.length - count);
       return S.slice(start, start + count).join('\n');
+    }
+
+    case 'prose_poem': {
+      return `${img1}落在${img2}上，发出极轻的声响。${emo}从远处漫过来，像旧时光的回声。我把${img3}装进口袋，以为这样就留住了这一刻。后来才明白，${coreRaw}——原来所有 ${emo2} 的瞬间，都是岁月写给自己的信。风一吹，信纸就翻到了下一页。`;
+    }
+
+    case 'sonnet': {
+      const clamp = (n: number, s: string) => {
+        let out = '', k = 0;
+        for (const ch of s) {
+          if (k >= n) break;
+          if (ch === ' ' || ch === '_') continue;
+          out += ch; k++;
+        }
+        return out;
+      };
+      return [
+        clamp(11, `我怎么能将${img1}比作夏天`),
+        clamp(11, `它比夏天更${emo}更悠远`),
+        clamp(11, `风把${img2}吹散在${img3}之间`),
+        clamp(11, `而${emo2}依旧留在原处不散`),
+        clamp(11, `有时候光太烈反而不见`),
+        clamp(11, `有时候记忆太深反而模糊`),
+        clamp(11, `一切美好的终将走向变迁`),
+        clamp(11, `唯有这一刻被诗行留住`),
+        clamp(11, `但你的夏天永远不会褪色`),
+        clamp(11, `你拥有的美也不会消逝`),
+        clamp(11, `当${img1}还在${emo}里沉默`),
+        clamp(11, `当${coreTiny}还在记忆里生长`),
+        clamp(11, `只要还有人在呼吸在阅读`),
+        clamp(11, `这首诗就将长存赐你生命`),
+      ].join('\n');
+    }
+
+    case 'cinquain': {
+      const nouns = [img1, img2, img3].filter(Boolean);
+      if (!nouns.length) nouns.push(coreTiny);
+      const pairs = [`柔软, ${emo}`, `宁静, 悠长`, '温暖, 明亮', '轻盈, 自由', `${emo}, ${emo2}`];
+      const triples = ['低语, 流淌, 停留', '摇曳, 回响, 沉淀', '轻吻, 拥抱, 绽放', '飘过, 停驻, 铭记', '漫过, 摇曳, 藏进'];
+      const feelings = [`想起${coreTiny}`, `${emo}${emo2}的味道`, '时间忽然慢下来', '这一刻被温柔以待'];
+      const endings = ['岁月', '心安', '时光', '归处', '远方', '铭记', coreTiny || '岁月'];
+      return [
+        pick(nouns, 0),
+        pick(pairs, 1),
+        pick(triples, 2),
+        pick(feelings, 3),
+        pick(endings, 4),
+      ].join('\n');
     }
 
     case 'free':
@@ -364,8 +490,12 @@ export async function POST(request: Request) {
     const userId = await getDefaultUserId();
 
     const body = await request.json();
-    const { sessionId, style = 'free', customMeaning, userPrompt, skipReview = false } = body;
+    const { sessionId, style: rawStyle = 'free', customMeaning, userPrompt, skipReview = false } = body;
     const hasUserPrompt = typeof userPrompt === 'string' && userPrompt.trim().length > 0;
+    // 兼容旧诗体值（classical → qiyan_jueju 等）
+    const style = LEGACY_STYLE_MAP[rawStyle] || rawStyle;
+    // 获取诗体专属指南；未知诗体使用自由诗指南作为兜底
+    const styleGuide = POEM_STYLE_GUIDE[style] || POEM_STYLE_GUIDE.free;
 
     if (!sessionId) {
       return NextResponse.json({ error: '缺少会话ID' }, { status: 400 });
@@ -576,7 +706,8 @@ ${userPrompt.trim()}
         .replace('{meaning}', meaning.coreMeaning || JSON.stringify(meaning))
         .replace('{emotion}', (meaning.emotions || []).join(', '))
         .replace('{imagery}', (meaning.imagery || []).join(', '))
-        .replace('{style}', style);
+        .replace('{style}', style)
+        .replace('{styleGuide}', styleGuide);
 
       if (visualElements.length) {
         poemPrompt = poemPrompt + `
@@ -626,7 +757,8 @@ ${userPrompt.trim()}
         const reviewPrompt = POEM_REVIEW_PROMPT
           .replace('{poem}', poemContent)
           .replace('{meaning}', meaning.coreMeaning || '')
-          .replace('{intent}', '照片生诗');
+          .replace('{intent}', '照片生诗')
+          .replace('{styleRequirement}', styleGuide);
         
         const reviewResult = await aiClient.generateTextWithFallback(
           reviewPrompt,
