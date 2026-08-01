@@ -45,6 +45,12 @@ export default function CreatePage() {
   const [error, setError] = useState('');
   const [completed, setCompleted] = useState(false);
 
+  // 用户补充的照片说明(背景/人物/关系/期望)
+  const [userScene, setUserScene] = useState('');
+  const [userPeople, setUserPeople] = useState('');
+  const [userRelation, setUserRelation] = useState('');
+  const [userWish, setUserWish] = useState('');
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -81,6 +87,16 @@ export default function CreatePage() {
 
   const removePhoto = (id: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  // 组装用户补充提示词为一个连贯文本(或空字符串)
+  const buildUserPrompt = () => {
+    const parts: string[] = [];
+    if (userScene.trim()) parts.push(`【拍摄背景/场景】：${userScene.trim()}`);
+    if (userPeople.trim()) parts.push(`【照片中的人物】：${userPeople.trim()}`);
+    if (userRelation.trim()) parts.push(`【人物关系/我的故事】：${userRelation.trim()}`);
+    if (userWish.trim()) parts.push(`【我对诗歌的期望】：${userWish.trim()}`);
+    return parts.join('\n');
   };
 
   const startCreation = async () => {
@@ -145,6 +161,7 @@ export default function CreatePage() {
           body: JSON.stringify({
             sessionId: sessionData.id,
             style,
+            userPrompt: buildUserPrompt(),
           }),
         });
 
@@ -187,6 +204,10 @@ export default function CreatePage() {
     setPoem('');
     setCompleted(false);
     setError('');
+    setUserScene('');
+    setUserPeople('');
+    setUserRelation('');
+    setUserWish('');
   };
 
   if (false) {
@@ -333,6 +354,62 @@ export default function CreatePage() {
                     <p className="text-sm font-medium">{styleOption.label}</p>
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* User Prompt Card */}
+          {photos.length > 0 && !loading && (
+            <div className="mt-8 card p-6 border-ink-200 bg-parchment-50/50">
+              <div className="mb-4 flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-ink-600" />
+                <h3 className="text-base font-semibold text-ink-800">
+                  补充照片说明（让诗歌更懂你的故事）
+                </h3>
+              </div>
+              <p className="mb-5 text-sm text-ink-500">
+                以下内容全部可选。填得越细致，生成的诗越贴合照片记忆。
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="label">拍摄背景/场景</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="例如：2023 年深秋，北京香山红叶片片"
+                    value={userScene}
+                    onChange={(e) => setUserScene(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">照片里的人物</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="例如：我和姥姥、邻居家的小花"
+                    value={userPeople}
+                    onChange={(e) => setUserPeople(e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">人物关系 / 我的小故事</label>
+                  <textarea
+                    className="textarea min-h-[96px]"
+                    placeholder="例如：这是我高考结束后第一次带姥姥出远门，她第一次坐缆车笑得特别开心。"
+                    value={userRelation}
+                    onChange={(e) => setUserRelation(e.target.value)}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">对诗歌的期望（可选）</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="例如：希望温暖一点，能读出祖孙间的那份牵挂；古诗风格更爱七言"
+                    value={userWish}
+                    onChange={(e) => setUserWish(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           )}

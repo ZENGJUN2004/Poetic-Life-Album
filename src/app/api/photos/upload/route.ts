@@ -101,7 +101,7 @@ export async function POST(request: Request) {
           if (aiClient.hasApiKey()) {
             const mime = file.type || 'image/jpeg';
             const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
-            const aiResult = await aiClient.analyzeImage(dataUrl, VISION_ANALYSIS_PROMPT);
+            const aiResult = await aiClient.analyzeImageWithFallback(dataUrl, VISION_ANALYSIS_PROMPT);
             const parsed = parseAIResponse(aiResult.content);
             if (parsed && (parsed.objects || parsed.scene || parsed.dominantColors)) {
               await prisma.photoAnalysis.upsert({

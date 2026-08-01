@@ -364,7 +364,8 @@ export async function POST(request: Request) {
     const userId = await getDefaultUserId();
 
     const body = await request.json();
-    const { sessionId, style = 'free', customMeaning, skipReview = false } = body;
+    const { sessionId, style = 'free', customMeaning, userPrompt, skipReview = false } = body;
+    const hasUserPrompt = typeof userPrompt === 'string' && userPrompt.trim().length > 0;
 
     if (!sessionId) {
       return NextResponse.json({ error: '缺少会话ID' }, { status: 400 });
@@ -429,7 +430,7 @@ export async function POST(request: Request) {
           }
         }
 
-        const analysisResult = await aiClient.analyzeImage(imageInput, VISION_ANALYSIS_PROMPT);
+        const analysisResult = await aiClient.analyzeImageWithFallback(imageInput, VISION_ANALYSIS_PROMPT);
         const parsedAnalysis = parseAIResponse(analysisResult.content);
         analyses.push({ url: photoUrl, analysis: parsedAnalysis });
 
@@ -499,14 +500,25 @@ export async function POST(request: Request) {
     
     if (customMeaning) {
       meaning = { coreMeaning: customMeaning, emotions: [], imagery: [], themes: [] };
+      if (hasUserPrompt) meaning._userPrompt = userPrompt.trim();
     } else {
       try {
         const combinedAnalysis = analyses.map((a) => a.analysis).filter(Boolean);
-        const meaningPrompt = MEANING_EXTRACTION_PROMPT.replace(
+        let meaningPrompt = MEANING_EXTRACTION_PROMPT.replace(
           '{analysis}',
           JSON.stringify(combinedAnalysis, null, 2)
         );
-        const meaningResult = await aiClient.generateText(
+        if (hasUserPrompt) {
+          meaningPrompt = meaningPrompt.replace(
+            '请以JSON格式输出。',
+            `
+用户补充的照片说明（以下内容为用户主观视角，请优先参考并以此为意义提炼的核心先验）：
+${userPrompt.trim()}
+
+请以JSON格式输出。`
+          );
+        }
+        const meaningResult = await aiClient.generateTextWithFallback(
           meaningPrompt,
           SYSTEM_PROMPTS.meaning,
           process.env.PLANNER_MODEL,
@@ -535,16 +547,59 @@ export async function POST(request: Request) {
     await transitionOrThrow(sessionId, 'WRITING');
     
     const writeStep = await csm.addStep(sessionId, 'WRITE', JSON.stringify({ meaning, style }));
-    
+
+    // Gather visual elements to inject as mandatory imagery into the poem prompt.
+    // We collect: detailedDescription (if AI vision succeeded) + objects/colors/scene
+    // from analysis (works for both AI and heuristic analyses).
+    const visualElements: string[] = [];
+    const detailedDescription = analyses
+      .map((a: any) => a?.analysis?.detailedDescription || a?.analysis?._detailedDescription)
+      .filter(Boolean)
+      .join(' / ');
+    if (detailedDescription) visualElements.push(`画面描述：${detailedDescription}`);
+
+    // Extract concrete objects and colors from all analyses (works even with heuristic)
+    for (const a of analyses) {
+      const an = a?.analysis;
+      if (!an) continue;
+      const objs = safeParse<string[]>(an.objects, []);
+      const colors = safeParse<Array<{name?:string;hex?:string}>>(an.dominantColors, []);
+      const scenes = safeParse<string[]>(an.scenes, an.scene ? [an.scene] : []);
+      if (objs.length) visualElements.push(`画面中可见的物体：${objs.join('、')}`);
+      if (colors.length) visualElements.push(`画面主色调：${colors.map(c=>c.name||c.hex).filter(Boolean).join('、')}`);
+      if (scenes.length) visualElements.push(`场景：${scenes.join('、')}`);
+    }
+
     let poemContent = '';
     try {
-      const poemPrompt = POEM_GENERATION_PROMPT
+      let poemPrompt = POEM_GENERATION_PROMPT
         .replace('{meaning}', meaning.coreMeaning || JSON.stringify(meaning))
         .replace('{emotion}', (meaning.emotions || []).join(', '))
         .replace('{imagery}', (meaning.imagery || []).join(', '))
         .replace('{style}', style);
 
-      const poemResult = await aiClient.generateText(
+      if (visualElements.length) {
+        poemPrompt = poemPrompt + `
+
+【画面视觉元素（必须在诗中引用至少3个）】：
+${visualElements.join('\n')}
+
+创作硬约束：
+- 诗中必须至少融入上述3个具体视觉元素（如某物体的特征、某种颜色、某个场景细节）
+- 不要泛化（如只写"自然风光"），要具体（如"橙色衣袂"、"草坡泛黄"）
+- 诗中意象应能在原画面中找到对应物`;
+      }
+
+      if (hasUserPrompt) {
+        poemPrompt = poemPrompt + `
+
+【用户补充的创作背景说明】：
+${userPrompt.trim()}
+
+创作提示：诗歌中可在合适位置自然融入上述人物称呼、关系、或故事片段，使作品更贴合照片的真实记忆。不需逐字复述用户说明，但整体情感与意象锚点应与用户说明一致。`;
+      }
+
+      const poemResult = await aiClient.generateTextWithFallback(
         poemPrompt,
         SYSTEM_PROMPTS.writer,
         process.env.WRITER_MODEL,
@@ -573,7 +628,7 @@ export async function POST(request: Request) {
           .replace('{meaning}', meaning.coreMeaning || '')
           .replace('{intent}', '照片生诗');
         
-        const reviewResult = await aiClient.generateText(
+        const reviewResult = await aiClient.generateTextWithFallback(
           reviewPrompt,
           SYSTEM_PROMPTS.reviewer,
           process.env.PLANNER_MODEL,
@@ -588,7 +643,7 @@ export async function POST(request: Request) {
           
           try {
             const polishPrompt = POEM_POLISH_PROMPT.replace('{poem}', poemContent);
-            const polishResult = await aiClient.generateText(
+            const polishResult = await aiClient.generateTextWithFallback(
               polishPrompt,
               SYSTEM_PROMPTS.writer,
               process.env.WRITER_MODEL,
@@ -643,7 +698,7 @@ export async function POST(request: Request) {
         .replace('{meaning}', meaning.coreMeaning || '')
         .replace('{imagery}', JSON.stringify(meaning.imagery || []));
       
-      const explainResult = await aiClient.generateText(
+      const explainResult = await aiClient.generateTextWithFallback(
         explainPrompt,
         SYSTEM_PROMPTS.writer,
         process.env.PLANNER_MODEL,

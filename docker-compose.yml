@@ -17,6 +17,10 @@ services:
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-in-production-please-set-a-real-secret}
       - NODE_ENV=production
+      # Ollama 兜底：容器内需通过 host.docker.internal 访问宿主机的 Ollama
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+      - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-aiden_lu/minicpm-v2.6:Q4_K_M}
+      - OLLAMA_TEXT_MODEL=${OLLAMA_TEXT_MODEL:-qwen2.5:7b}
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => { process.exit(r.statusCode === 200 || r.statusCode === 307 ? 0 : 1) }).on('error', () => process.exit(1))"]
       interval: 30s
