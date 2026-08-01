@@ -84,7 +84,7 @@ export default function Footer() {
 
         <div className="mt-12 border-t border-parchment-200 pt-8 text-center">
           <p className="text-sm text-ink-500">
-            © 2024 PoeticRealm 诗意生活相册. 保留所有权利.
+            © 2026 PoeticRealm 诗意生活相册. 保留所有权利.
           </p>
           <p className="mt-2 text-xs text-ink-400">
             Meaning-Centered Creative Computing · 意义中心创作计算
